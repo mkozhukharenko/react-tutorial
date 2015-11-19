@@ -15,6 +15,8 @@ var path = require('path');
 var express = require('express');
 var bodyParser = require('body-parser');
 var app = express();
+var _ = require('lodash');
+var async = require("async");
 
 var COMMENTS_FILE = path.join(__dirname, 'comments.json');
 
@@ -48,7 +50,7 @@ app.post('/api/comments', function(req, res) {
     var newComment = {
       id: Date.now(),
       author: req.body.author,
-      text: req.body.text,
+      text: req.body.text
     };
     comments.push(newComment);
     fs.writeFile(COMMENTS_FILE, JSON.stringify(comments, null, 4), function(err) {
@@ -62,6 +64,32 @@ app.post('/api/comments', function(req, res) {
   });
 });
 
+app.delete('/api/comment/:id', function(req, res) {
+  fs.readFile(COMMENTS_FILE, function(err, data) {
+    if (err) {
+      console.error(err);
+      process.exit(1);
+    }
+    var id = req.param('id');
+    var comments = JSON.parse(data);
+
+    async.filter(comments, function(item, callback) {
+      callback(item.id !==  parseInt(id, 10));
+    }, writeToDB );
+
+    function writeToDB (result) {
+      fs.writeFile(COMMENTS_FILE, JSON.stringify(result, null, 4), function(err) {
+        if (err) {
+          console.error(err);
+          process.exit(1);
+        }
+        res.setHeader('Cache-Control', 'no-cache');
+        res.json(result);
+      });
+    }
+
+  });
+});
 
 app.listen(app.get('port'), function() {
   console.log('Server started: http://localhost:' + app.get('port') + '/');
